@@ -14,20 +14,23 @@
         <Style TargetType="{x:Type Image}">
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
-        <Style TargetType="{x:Type Button}" x:Key="RecordButton" >
+        <Style TargetType="{x:Type Button}" x:Key="RecordButton">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Grid>
                             <StackPanel Orientation="Horizontal" Background="Transparent">
-                                <TextBlock x:Name="RecordText" Text="{TemplateBinding Content}" TextAlignment="Left"  VerticalAlignment="Center" Foreground="{StaticResource KinectPurpleBrush}" FontSize="15" />
+                                <TextBlock x:Name="RecordText" Text="{TemplateBinding Content}" TextAlignment="Left"
+                                           VerticalAlignment="Center" Foreground="{StaticResource KinectPurpleBrush}"
+                                           FontSize="15" />
                             </StackPanel>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="true">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Setter Property="Visibility" Value="Visible" />
-                                <Setter Property="Foreground" Value="{StaticResource KinectBlueBrush}" TargetName="RecordText" />
+                                <Setter Property="Foreground" Value="{StaticResource KinectBlueBrush}"
+                                        TargetName="RecordText" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -44,17 +47,20 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" HorizontalAlignment="Left" Margin="0 10 0 5" FontFamily="Segoe UI" FontSize="18">Kinect v2.0</TextBlock>
-        <TextBlock Grid.Row="0" HorizontalAlignment="Right" Margin="0 0 -1 0" VerticalAlignment="Bottom" Foreground="{StaticResource MediumGreyBrush}" FontFamily="Segoe UI" FontSize="18">Video and Audio Recorder</TextBlock>
-        
+        <TextBlock Grid.Row="0" HorizontalAlignment="Right" Margin="0 0 -1 0" VerticalAlignment="Bottom"
+                   Foreground="{StaticResource MediumGreyBrush}" FontFamily="Segoe UI" FontSize="18">
+            Video and Audio Recorder
+        </TextBlock>
+
         <Viewbox Grid.Row="1" HorizontalAlignment="Center">
             <Image Source="{Binding ImageSource}" Stretch="UniformToFill" />
         </Viewbox>
 
-        <Button Grid.Row="2" Content="Record" Height="Auto" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10 10 0 10" Click="RecordButton_Click">
+        <Button Grid.Row="2" Content="Record" Height="Auto" HorizontalAlignment="Right" VerticalAlignment="Center"
+                Margin="10 10 0 10" Click="RecordButton_Click" />
 
-        </Button>
-
-        <StatusBar Grid.Row="3" HorizontalAlignment="Stretch" Name="statusBar" VerticalAlignment="Bottom" Background="White" Foreground="{StaticResource MediumGreyBrush}">
+        <StatusBar Grid.Row="3" HorizontalAlignment="Stretch" Name="statusBar" VerticalAlignment="Bottom"
+                   Background="White" Foreground="{StaticResource MediumGreyBrush}">
             <StatusBarItem Content="{Binding StatusText}" />
         </StatusBar>
     </Grid>

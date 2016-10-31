@@ -1,47 +1,35 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Accord.Math;
 using Accord.Video.FFMPEG;
 using AviFile;
 using Microsoft.Kinect;
-using NAudio;
-using NAudio.Utils;
-using NAudio.Wave;
 using NAudio.CoreAudioApi;
+using NAudio.Wave;
 
 namespace KinectRecorder
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    ///     Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : INotifyPropertyChanged
     {
-
-        private const int s_BytesPerSample = sizeof(float);
-        private const int s_SamplesPerMillisecond = 16;
-
-        private KinectSensor m_KinectSensor;
-
-        private ColorFrameReader m_ColorFrameReader;
         private readonly WriteableBitmap m_ColorBitmap;
-        private string m_StatusText;
-        private VideoFileWriter m_Writer;
+        private readonly WasapiCapture m_AudioCapture;
 
         private AudioBeamFrameReader m_AudioFrameReader;
-        private AudioSource m_AudioSource;
-        private WaveFileWriter m_WaveFileWriter;
-        private int m_Offset;
-        private WasapiCapture m_AudioCapture;
-        private bool m_Recording;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        public ImageSource ImageSource => m_ColorBitmap;
+        private ColorFrameReader m_ColorFrameReader;
+
+        private KinectSensor m_KinectSensor;
+        private bool m_Recording;
+        private string m_StatusText;
+        private readonly WaveFileWriter m_WaveFileWriter;
+        private VideoFileWriter m_Writer;
 
         public MainWindow()
         {
@@ -53,104 +41,41 @@ namespace KinectRecorder
             m_KinectSensor.IsAvailableChanged += Sensor_IsAvailableChanged;
             m_KinectSensor.Open();
 
+            //var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".wav");
             //set up audio
-            //m_AudioSource = m_KinectSensor.AudioSource;
-            //m_AudioFrameReader = m_KinectSensor.AudioSource.OpenReader();
-            //m_AudioFrameReader.FrameArrived += AudioFrameReaderOnFrameArrived;
+            var devices = new MMDeviceEnumerator();
+            MMDeviceCollection endPoints = devices.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+            MMDevice device = endPoints.FirstOrDefault(x => x.FriendlyName.Contains("Xbox NUI Sensor"));
+            var waveFormat = new WaveFormat();
+            if (device != null)
+            {
+                m_AudioCapture = new WasapiCapture(device);
+                m_AudioCapture.DataAvailable += OnAudioCaptureOnDataAvailable;
+
+                waveFormat = m_AudioCapture.WaveFormat;
+            }
+            m_WaveFileWriter = new WaveFileWriter("test.wav", waveFormat);
 
             //set up video
             m_ColorFrameReader = m_KinectSensor.ColorFrameSource.OpenReader();
             m_ColorFrameReader.FrameArrived += Reader_ColorFrameArrived;
             FrameDescription colorFrameDescription =
                 m_KinectSensor.ColorFrameSource.CreateFrameDescription(ColorImageFormat.Bgra);
-            m_ColorBitmap = new WriteableBitmap(colorFrameDescription.Width, colorFrameDescription.Height, colorFrameDescription.LengthInPixels, colorFrameDescription.LengthInPixels, PixelFormats.Bgr32, null);
-            
+            m_ColorBitmap = new WriteableBitmap(colorFrameDescription.Width, colorFrameDescription.Height,
+                colorFrameDescription.LengthInPixels, colorFrameDescription.LengthInPixels, PixelFormats.Bgr32, null);
+
             //update status bar
             UpdateStatusText();
 
-            var devices = new MMDeviceEnumerator();
-            MMDeviceCollection endPoints = devices.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-
-            MMDevice device = endPoints.FirstOrDefault(x => x.FriendlyName.Contains("Xbox NUI Sensor"));
-
-            var waveFormat = new WaveFormat();
-            
-            if (device != null)
-            {
-                m_AudioCapture = new WasapiCapture(device);
-                m_AudioCapture.DataAvailable += OnAudioCaptureOnDataAvailable;
-                
-                waveFormat = m_AudioCapture.WaveFormat;
-            }
-
-            m_Offset = 0;
-
-            //var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".wav");
-            
-            m_WaveFileWriter = new WaveFileWriter("test.wav", waveFormat);
-
-            //WaveStream stream = new RawSourceWaveStream();
-            //WaveFileWriter.CreateWaveFile(tempFile, sourceStream);
             //set up writer
             m_Writer = new VideoFileWriter();
             m_Writer.Open("test.avi", colorFrameDescription.Width, colorFrameDescription.Height, 30, VideoCodec.H264);
-            //40000, AudioCodec.None, 100000, 44000, 1); 
 
             m_Recording = false;
             m_AudioCapture?.StartRecording();
         }
 
-        private void OnAudioCaptureOnDataAvailable(object sender, WaveInEventArgs args)
-        {
-            if (m_Recording)
-            {
-                m_WaveFileWriter.Write(args.Buffer, 0, args.BytesRecorded);
-            }
-            
-        }
-
-        private void AudioFrameReaderOnFrameArrived(object sender, AudioBeamFrameArrivedEventArgs audioBeamFrameArrivedEventArgs)
-        {
-            using (AudioBeamFrameList frameList = audioBeamFrameArrivedEventArgs.FrameReference.AcquireBeamFrames())
-            {
-                if (frameList == null)
-                {
-                    return;
-                }
-
-                var subFrameList = frameList[0].SubFrames;
-
-                foreach (AudioBeamSubFrame subFrame in subFrameList)
-                {
-                    using (KinectBuffer sFrame = subFrame.LockAudioBuffer())
-                    {
-                        var audioBuffer = new byte[m_AudioSource.SubFrameLengthInBytes];
-
-                        subFrame.CopyFrameDataToArray(audioBuffer);
-
-                        m_WaveFileWriter.Write(audioBuffer, 0, audioBuffer.Length);
-                        //m_Writer.WriteAudioFrame(audioBuffer);  
-                        m_Offset ++;
-                    }
-                }
-            }
-        }
-
-        private void Sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
-        {
-            UpdateStatusText();
-        }
-
-        private void UpdateStatusText()
-        {
-            if (m_KinectSensor != null)
-            {
-                StatusText = m_KinectSensor.IsAvailable 
-                    ? Properties.Resources.RunningStatusText 
-                    : Properties.Resources.SensorNotAvailableStatusText;
-            }
-            else StatusText = Properties.Resources.NoSensorStatusText;
-        }
+        public ImageSource ImageSource => m_ColorBitmap;
 
         public string StatusText
         {
@@ -163,6 +88,32 @@ namespace KinectRecorder
             }
         }
 
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnAudioCaptureOnDataAvailable(object sender, WaveInEventArgs args)
+        {
+            if (m_Recording)
+            {
+                m_WaveFileWriter.Write(args.Buffer, 0, args.BytesRecorded);
+            }
+        }
+
+        private void Sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
+        {
+            UpdateStatusText();
+        }
+
+        private void UpdateStatusText()
+        {
+            if (m_KinectSensor != null)
+            {
+                StatusText = m_KinectSensor.IsAvailable
+                    ? Properties.Resources.RunningStatusText
+                    : Properties.Resources.SensorNotAvailableStatusText;
+            }
+            else StatusText = Properties.Resources.NoSensorStatusText;
+        }
+
         private void Reader_ColorFrameArrived(object sender, ColorFrameArrivedEventArgs e)
         {
             ThreadWriteVideo(e);
@@ -170,7 +121,7 @@ namespace KinectRecorder
 
         private void ThreadWriteVideo(object state)
         {
-            using (ColorFrame colorFrame = ((ColorFrameArrivedEventArgs)state).FrameReference.AcquireFrame())
+            using (ColorFrame colorFrame = ((ColorFrameArrivedEventArgs) state).FrameReference.AcquireFrame())
             {
                 if (colorFrame == null)
                     return;
@@ -180,14 +131,18 @@ namespace KinectRecorder
                 using (KinectBuffer colorBuffer = colorFrame.LockRawImageBuffer())
                 {
                     m_ColorBitmap.Lock();
-                    if (colorFrameDescription.Width == m_ColorBitmap.PixelWidth && colorFrameDescription.Height == m_ColorBitmap.PixelHeight)
+                    if (colorFrameDescription.Width == m_ColorBitmap.PixelWidth &&
+                        colorFrameDescription.Height == m_ColorBitmap.PixelHeight)
                     {
                         //ui stuff
-                        var size = (uint)(colorFrameDescription.Width*colorFrameDescription.Height*4);
+                        var size = (uint) (colorFrameDescription.Width*colorFrameDescription.Height*4);
                         colorFrame.CopyConvertedFrameDataToIntPtr(m_ColorBitmap.BackBuffer, size, ColorImageFormat.Bgra);
-                        m_ColorBitmap.AddDirtyRect(new Int32Rect(0,0, m_ColorBitmap.PixelWidth, m_ColorBitmap.PixelHeight));
+                        m_ColorBitmap.AddDirtyRect(new Int32Rect(0, 0, m_ColorBitmap.PixelWidth,
+                            m_ColorBitmap.PixelHeight));
 
-                        BitmapSource source = BitmapSource.Create(m_ColorBitmap.PixelWidth, m_ColorBitmap.PixelHeight, m_ColorBitmap.DpiX, m_ColorBitmap.DpiY, m_ColorBitmap.Format, m_ColorBitmap.Palette, m_ColorBitmap.BackBuffer, (int) size, m_ColorBitmap.BackBufferStride);
+                        BitmapSource source = BitmapSource.Create(m_ColorBitmap.PixelWidth, m_ColorBitmap.PixelHeight,
+                            m_ColorBitmap.DpiX, m_ColorBitmap.DpiY, m_ColorBitmap.Format, m_ColorBitmap.Palette,
+                            m_ColorBitmap.BackBuffer, (int) size, m_ColorBitmap.BackBufferStride);
 
                         using (var stream = new MemoryStream())
                         {
@@ -200,18 +155,11 @@ namespace KinectRecorder
 
                             m_Writer.WriteVideoFrame(bitmap);
                             m_Recording = true;
-
                         }
                     }
                     m_ColorBitmap.Unlock();
                 }
-
-            }            
-        }
-
-        private void WriteVideo(BitmapSource source)
-        {
-
+            }
         }
 
 
@@ -224,7 +172,6 @@ namespace KinectRecorder
             DisposeColorFrameReader();
             CloseKinectSensor();
             CloseVideoRecorder();
-
 
 
             CombineAndSaveAv();
@@ -266,9 +213,9 @@ namespace KinectRecorder
             m_Writer.Close();
             m_Writer = null;
         }
+
         private void RecordButton_Click(object sender, RoutedEventArgs e)
         {
-
         }
     }
 }

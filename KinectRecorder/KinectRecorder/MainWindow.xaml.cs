@@ -63,7 +63,7 @@ namespace KinectRecorder
             m_ColorFrameReader.FrameArrived += Reader_ColorFrameArrived;
             FrameDescription colorFrameDescription =
                 m_KinectSensor.ColorFrameSource.CreateFrameDescription(ColorImageFormat.Bgra);
-            m_ColorBitmap = new WriteableBitmap(colorFrameDescription.Width, colorFrameDescription.Height, 96.0, 96.0, PixelFormats.Bgr32, null);
+            m_ColorBitmap = new WriteableBitmap(colorFrameDescription.Width, colorFrameDescription.Height, colorFrameDescription.LengthInPixels, colorFrameDescription.LengthInPixels, PixelFormats.Bgr32, null);
             
             //update status bar
             UpdateStatusText();
@@ -93,7 +93,7 @@ namespace KinectRecorder
             //WaveFileWriter.CreateWaveFile(tempFile, sourceStream);
             //set up writer
             m_Writer = new VideoFileWriter();
-            m_Writer.Open("test.avi", colorFrameDescription.Width, colorFrameDescription.Height, 30, VideoCodec.Default);
+            m_Writer.Open("test.avi", colorFrameDescription.Width, colorFrameDescription.Height, 30, VideoCodec.H264);
             //40000, AudioCodec.None, 100000, 44000, 1); 
 
             m_Recording = false;
